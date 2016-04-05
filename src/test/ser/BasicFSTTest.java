@@ -5,6 +5,7 @@ import org.nustaq.serialization.*;
 import org.junit.Test;
 import org.nustaq.serialization.annotations.Version;
 
+import java.awt.*;
 import java.io.*;
 import java.lang.Boolean;
 import java.util.ArrayList;
@@ -297,11 +298,79 @@ public class BasicFSTTest {
 
     }
 
+
+    public static class Issue84 implements Serializable{
+
+        private static final long serialVersionUID = 4180807184662357818L;
+
+        public Issue84(Object code) {
+            this.code = code;
+        }
+
+        private Object code;
+    }
+
+    public static class CodeSRO implements Serializable {
+
+        private static final long         serialVersionUID = -5384611645588792010L;
+
+        private Integer                   id;
+
+        private String                    code;
+
+        public CodeSRO(Integer id, String code) {
+            this.id = id;
+            this.code = code;
+        }
+    }
+
+    public static class CodeSRONew implements Serializable {
+
+        private static final long         serialVersionUID = -5384611645588792010L;
+
+        public CodeSRONew(Integer id1, String code1, String extCode) {
+            id = id1;
+            code = code1;
+            this.extCode = extCode;
+        }
+
+        private Integer                   id;
+
+        private String                    code;
+
+        @Version(1)
+        private String                    extCode;
+    }
+
+    @Test
+    public void testVersioningIssue84() {
+
+        Object[] oldClz = { new Issue84(new CodeSRO(13,"13")), 1 };
+
+        FSTConfiguration oldConf = getTestConfiguration();
+        oldConf.registerClass(CodeSRO.class);
+
+        byte[] bytes = oldConf.asByteArray(oldClz);
+        Object res = oldConf.asObject(bytes);
+
+        // assure default works
+        assertTrue(DeepEquals.deepEquals(oldClz, res));
+
+        // trick to use different class for reading by prereistering
+        FSTConfiguration newConf = getTestConfiguration();
+        newConf.registerClass(CodeSRONew.class);
+
+        Object newClz = newConf.asObject(bytes);
+        System.out.println(newClz);
+
+    }
+
+
+
     protected FSTConfiguration getTestConfiguration() {
         FSTConfiguration.isAndroid = false;
         return FSTConfiguration.createDefaultConfiguration();
     }
-
 
     @Test
     public void testPrimitives() throws Exception {
@@ -352,6 +421,50 @@ public class BasicFSTTest {
         HashMap res = (HashMap) in.readObject();
         assertTrue(res.get("x") == res.get("y"));
         assertTrue(DeepEquals.deepEquals(obj,res));
+    }
+
+    static class FOO implements Serializable {
+        FOO()
+        {
+        }
+        Object[] foos;
+    }
+
+    @Test
+    public void testSelfRef() {
+        FOO[] test = new FOO[1];
+        test[0] = new FOO();
+        test[0].foos = test;
+        FSTConfiguration tf = getTestConfiguration();
+        Object deser = tf.asObject(tf.asByteArray(test));
+        assertTrue(DeepEquals.deepEquals(deser,test));
+    }
+
+    @Test
+    public void testSelfRefArr() {
+        Object[] test = new Object[1];
+        test[0] = test;
+        FSTConfiguration tf = getTestConfiguration();
+        Object deser = tf.asObject(tf.asByteArray(test));
+        assertTrue(DeepEquals.deepEquals(deser,test));
+    }
+
+    @Test
+    public void testSelfRefRefArr() {
+        Object[] test = new Object[1];
+        test[0] = new Object[]{test};
+        FSTConfiguration tf = getTestConfiguration();
+        Object deser = tf.asObject(tf.asByteArray(test));
+        assertTrue(DeepEquals.deepEquals(deser,test));
+    }
+
+    @Test
+    public void testSelfRef2Arr() {
+        Object[][] test = new Object[1][];
+        test[0] = new Object[]{test,test[0]};
+        FSTConfiguration tf = getTestConfiguration();
+        Object deser = tf.asObject(tf.asByteArray(test));
+        assertTrue(DeepEquals.deepEquals(deser,test));
     }
 
 //    @Test
@@ -427,6 +540,29 @@ public class BasicFSTTest {
         Strings res = (Strings) in.readObject();
         assertTrue(DeepEquals.deepEquals(res.junk, res.junk1));
         assertTrue(DeepEquals.deepEquals(obj,res));
+    }
+
+    @Test
+    public void security() {
+        FSTConfiguration conf = FSTConfiguration
+            .createDefaultConfiguration()
+            .setVerifier(new FSTConfiguration.ClassSecurityVerifier() {
+                @Override // need to stick to 1.7, could be lambda
+                public boolean allowClassDeserialization(Class cl) {
+                    if ( cl.getPackage().getName().startsWith("java.awt") )
+                        return false;
+                    return true;
+                }
+        });
+
+        try {
+            byte[] hallos = conf.asByteArray(new Dimension(13,13));
+            conf.asObject(hallos);
+            assertTrue(false);
+        } catch (Exception ex) {
+            // success
+            System.out.println(ex.getMessage());
+        }
     }
 
     @Test

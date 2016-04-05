@@ -38,7 +38,6 @@ import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * manages + generates struct instrumented classes
@@ -77,6 +76,7 @@ public class FSTStructFactory {
             }
         };
         defaultPool.appendSystemPath();
+
         proxyLoader = new Loader(FSTStructFactory.class.getClassLoader(), defaultPool)
         {
             protected Class loadClassByDelegation(String name)
@@ -131,6 +131,14 @@ public class FSTStructFactory {
             orig = pool.makeClass( new ByteArrayInputStream(rawByteClassDefs.get(clazz.getName())));
         } else {
             orig = pool.getOrNull(clazz.getName());
+            if ( orig == null ) {
+                pool.insertClassPath(new ClassClassPath(clazz));
+                orig = pool.get(clazz.getName());
+                if (orig == null)
+                {
+                    throw new RuntimeException("unable to locate class byte code for "+clazz.getName());
+                }
+            }
         }
         newClz.setSuperclass(orig);
 

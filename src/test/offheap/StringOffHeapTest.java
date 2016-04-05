@@ -6,6 +6,8 @@ import org.nustaq.offheap.FSTAsciiStringOffheapMap;
 import org.nustaq.offheap.OffHeapByteTree;
 import org.nustaq.offheap.bytez.ByteSource;
 import org.nustaq.offheap.bytez.bytesource.AsciiStringByteSource;
+import org.nustaq.offheap.structs.structtypes.StructByteString;
+import org.nustaq.offheap.structs.structtypes.StructString;
 import org.nustaq.serialization.FSTConfiguration;
 import org.nustaq.serialization.simpleapi.DefaultCoder;
 import org.nustaq.serialization.simpleapi.FSTCoder;
@@ -14,6 +16,7 @@ import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Created by ruedi on 30.06.14.
@@ -21,6 +24,16 @@ import java.util.Iterator;
 public class StringOffHeapTest {
 
     public static final long STORE_INITIAL_SIZE = FSTAsciiStringOffheapMap.MB;
+
+    @Test
+    public void testStrComp() {
+        StructString aca = new StructString("acad-h-");
+        StructString acad = new StructString("academ---");
+        Assert.assertTrue( aca.compareTo(acad) == "acad-h-".compareTo("academ---"));
+        StructByteString baca = new StructByteString("academi");
+        StructByteString bacad = new StructByteString("academian");
+        Assert.assertTrue( baca.compareTo(bacad) == "academi".compareTo("academian"));
+    }
 
     @Test
     public void testIndex() {
@@ -110,11 +123,18 @@ public class StringOffHeapTest {
             }
             store.dumpIndexStats();
 
+            List<String> toRemove = new ArrayList<>();
+            int siz = store.getSize();
             for (java.util.Iterator iterator = store.values(); iterator.hasNext(); ) {
                 String next = (String) iterator.next();
                 if (Math.random() > .5)
-                    store.remove(next);
+                    toRemove.add(next);
             }
+            for (int i = 0; i < toRemove.size(); i++) {
+                String s = toRemove.get(i);
+                store.remove(s);
+            }
+            Assert.assertEquals(store.getSize(),siz-toRemove.size());
             store.dumpIndexStats();
             store.free();
 
